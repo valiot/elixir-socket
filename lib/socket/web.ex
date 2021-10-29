@@ -31,7 +31,8 @@ defmodule Socket.Web do
 
   """
 
-  use    Bitwise
+  @otp_vesion System.otp_release() |> Integer.parse() |> elem(0)
+
   import Kernel, except: [length: 1, send: 2]
   alias __MODULE__, as: W
 
@@ -550,25 +551,25 @@ defmodule Socket.Web do
   # more data, this means we can optimize and do it 4 bytes at a time and then
   # fallback to the smaller sizes
   defp unmask(key, << data :: 32, rest :: binary >>, acc) do
-    unmask(key, rest, << acc :: binary, data ^^^ key :: 32 >>)
+    unmask(key, rest, << acc :: binary, xor(data, key) :: 32 >>)
   end
 
   defp unmask(key, << data :: 24 >>, acc) do
     << key :: 24, _ :: 8 >> = << key :: 32 >>
 
-    unmask(key, <<>>, << acc :: binary, data ^^^ key :: 24 >>)
+    unmask(key, <<>>, << acc :: binary, xor(data, key) :: 24 >>)
   end
 
   defp unmask(key, << data :: 16 >>, acc) do
     << key :: 16, _ :: 16 >> = << key :: 32 >>
 
-    unmask(key, <<>>, << acc :: binary, data ^^^ key :: 16 >>)
+    unmask(key, <<>>, << acc :: binary, xor(data, key) :: 16 >>)
   end
 
   defp unmask(key, << data :: 8 >>, acc) do
     << key :: 8, _ :: 24 >> = << key :: 32 >>
 
-    unmask(key, <<>>, << acc :: binary, data ^^^ key :: 8 >>)
+    unmask(key, <<>>, << acc :: binary, xor(data, key) :: 8 >>)
   end
 
   defp unmask(_, <<>>, acc) do
@@ -950,5 +951,11 @@ defmodule Socket.Web do
   @spec abort(t) :: :ok | { :error, error }
   def abort(%W{socket: socket}) do
     Socket.Stream.close(socket)
+  end
+
+  if @otp_vesion >= 24 do
+    defp xor(a, b), do: Bitwise.bxor(a, b)
+  else
+    defp xor(a, b), do: Bitwise.^^^(a, b)
   end
 end
